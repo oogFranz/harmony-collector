@@ -226,6 +226,8 @@
           toggleSustainKey(key);
         });
         key.addEventListener('touchend', () => {});
+        key.addEventListener('touchcancel', () => {});
+        key.addEventListener('touchmove', () => {});
         return;
       }
 
@@ -239,6 +241,8 @@
       key.addEventListener('mouseleave', () => stopSound(key));
       key.addEventListener('touchstart', () => playSound(key));
       key.addEventListener('touchend', () => stopSound(key));
+      key.addEventListener('touchcancel', () => stopSound(key));
+      key.addEventListener('touchmove', () => {});
     };
 
     const createKeyboard = () => {
