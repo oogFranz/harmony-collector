@@ -222,6 +222,10 @@
         key.addEventListener('mouseenter', () => {});
         key.addEventListener('mouseup', () => {});
         key.addEventListener('mouseleave', () => {});
+        key.addEventListener('touchstart', () => {
+          toggleSustainKey(key);
+        });
+        key.addEventListener('touchend', () => {});
         return;
       }
 
@@ -233,6 +237,8 @@
       });
       key.addEventListener('mouseup', () => stopSound(key));
       key.addEventListener('mouseleave', () => stopSound(key));
+      key.addEventListener('touchstart', () => playSound(key));
+      key.addEventListener('touchend', () => stopSound(key));
     };
 
     const createKeyboard = () => {
