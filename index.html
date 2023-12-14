@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harmony Collector</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .keyboard {
+      display: flex;
+      margin-bottom: 20px;
+    }
+    .key {
+      height: 120px;
+      border: 1px solid #000;
+      cursor: pointer;
+      user-select: none;
+    }
+    .key.active { 
+        background-color: #f8f87c;
+    }
+    .white-key {
+      width: 40px;
+      background-color: #fff;
+    }
+    .black-key {
+      width: 25px;
+      height: 80px;
+      background-color: #000;
+      position: relative;
+      margin: 0 -12.5px;
+      z-index: 1;
+    }
+  </style>
+</head>
+<body>
+    <div style="display: flex; gap: 20px; margin-bottom: 10px;">
+        <label for="hz">Frequency (Hz):</label>
+        <select id="hz" onchange="updateTuningFrequency()">
+            <option value="440">440 Hz</option>
+            <option value="442">442 Hz</option>
+        </select>
+
+        <label for="sustain">Sustain :</label>
+        <select id="sustain" onchange="updateSustainMode()">
+            <option value="false">false</option>
+            <option value="true">true</option>
+        </select>
+    
+        <label for="tuning">Tuning:</label>
+        <select id="tuning" onchange="updateTuning()">
+            <option value="equal">Equal Temperament</option>
+            <option value="just">Just Intonation</option>
+            <option value="pythagorean">Pythagorean Tuning</option>
+        </select>
+
+        <div id="keySelector" style="display: none;">
+            <label for="key">Key:</label>
+            <select id="key" onchange="updateKey()">
+              <option value="C">C</option>
+              <option value="C#">C#</option>
+              <option value="D">D</option>
+              <option value="D#">D#</option>
+              <option value="E">E</option>
+              <option value="F">F</option>
+              <option value="F#">F#</option>
+              <option value="G">G</option>
+              <option value="G#">G#</option>
+              <option value="A">A</option>
+              <option value="A#">A#</option>
+              <option value="B">B</option>
+            </select>
+          </div>
+    </div>
+  
+    <div class="keyboard" id="keyboard"></div>
+
+  <script>
+    let tuningType = 'equal';
+    let tuningFrequency = 440;
+    let baseKey = 'C';
+
+    let sustainMode = false;
+    let sustainedKeys = new Set();
+
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+    const noteFrequencies = {
+        "C": 16.351597831287414,
+        "C#": 17.323914436054505,
+        "D": 18.354047994837977,
+        "D#": 19.445436482630058,
+        "E": 20.601722307054366,
+        "F": 21.826764464562746,
+        "F#": 23.12465141947715,
+        "G": 24.49971474885933,
+        "G#": 25.956543598746574,
+        "A": 27.5,
+        "A#": 29.13523509488062,
+        "B": 30.86770632850775,
+    };
+
+    const ratios = { 
+        "equal": [
+            1,
+            1.0594630943592953,
+            1.122462048309373,
+            1.189207115002721,
+            1.2599210498948732,
+            1.3348398541700344,
+            1.4142135623730951,
+            1.4983070768766815,
+            1.5874010519681994,
+            1.681792830507429,
+            1.7817974362806785,
+            1.887748625363387,
+        ],
+        "just": [
+            1,
+            16/15,
+            9/8,
+            6/5,
+            5/4,
+            4/3,
+            45/32,
+            3/2,
+            8/5,
+            5/3,
+            9/5,
+            15/8,
+        ],
+        "pythagorean": [
+            1,
+            256/243,
+            9/8,
+            32/27,
+            81/64,
+            4/3,
+            729/512,
+            3/2,
+            128/81,
+            27/16,
+            16/9,
+            243/128,
+        ],
+    };
+
+    const notes = [
+            'C',
+            'C#',
+            'D',
+            'D#',
+            'E',
+            'F',
+            'F#',
+            'G',
+            'G#',
+            'A',
+            'A#',
+            'B',
+        ];
+
+    const keys = [
+        { note: 'C', octave: 3, isWhiteKey: true },
+        { note: 'C#', octave: 3, isWhiteKey: false },
+        { note: 'D', octave: 3, isWhiteKey: true },
+        { note: 'D#', octave: 3, isWhiteKey: false },
+        { note: 'E', octave: 3, isWhiteKey: true },
+        { note: 'F', octave: 3, isWhiteKey: true },
+        { note: 'F#', octave: 3, isWhiteKey: false },
+        { note: 'G', octave: 3, isWhiteKey: true },
+        { note: 'G#', octave: 3, isWhiteKey: false },
+        { note: 'A', octave: 3, isWhiteKey: true },
+        { note: 'A#', octave: 3, isWhiteKey: false },
+        { note: 'B', octave: 3, isWhiteKey: true },
+        { note: 'C', octave: 4, isWhiteKey: true },
+        { note: 'C#', octave: 4, isWhiteKey: false },
+        { note: 'D', octave: 4, isWhiteKey: true },
+        { note: 'D#', octave: 4, isWhiteKey: false },
+        { note: 'E', octave: 4, isWhiteKey: true },
+        { note: 'F', octave: 4, isWhiteKey: true },
+        { note: 'F#', octave: 4, isWhiteKey: false },
+        { note: 'G', octave: 4, isWhiteKey: true },
+        { note: 'G#', octave: 4, isWhiteKey: false },
+        { note: 'A', octave: 4, isWhiteKey: true },
+        { note: 'A#', octave: 4, isWhiteKey: false },
+        { note: 'B', octave: 4, isWhiteKey: true },
+        { note: 'C', octave: 5, isWhiteKey: true },
+        { note: 'C#', octave: 5, isWhiteKey: false },
+        { note: 'D', octave: 5, isWhiteKey: true },
+        { note: 'D#', octave: 5, isWhiteKey: false },
+        { note: 'E', octave: 5, isWhiteKey: true },
+        { note: 'F', octave: 5, isWhiteKey: true },
+        { note: 'F#', octave: 5, isWhiteKey: false },
+        { note: 'G', octave: 5, isWhiteKey: true },
+        { note: 'G#', octave: 5, isWhiteKey: false },
+        { note: 'A', octave: 5, isWhiteKey: true },
+        { note: 'A#', octave: 5, isWhiteKey: false },
+        { note: 'B', octave: 5, isWhiteKey: true },
+    ];
+
+    const createKey = (note, octave, isWhiteKey) => {
+      const key = document.createElement('div');
+      key.className = `key ${isWhiteKey ? 'white-key' : 'black-key'}`;
+      key.dataset.note = `${note}`;
+      key.dataset.octave = `${octave}`;
+      setEventListeners(key);
+      return key;
+    };
+
+    const setEventListeners = (key) => {
+      if (sustainMode) {
+        key.addEventListener('mousedown', () => {
+          toggleSustainKey(key);
+        });
+        key.addEventListener('mouseenter', () => {});
+        key.addEventListener('mouseup', () => {});
+        key.addEventListener('mouseleave', () => {});
+        return;
+      }
+
+      key.addEventListener('mousedown', () => playSound(key));
+      key.addEventListener('mouseenter', () => {
+        if (event.buttons === 1) {
+          playSound(key);
+        }
+      });
+      key.addEventListener('mouseup', () => stopSound(key));
+      key.addEventListener('mouseleave', () => stopSound(key));
+    };
+
+    const createKeyboard = () => {
+      const keyboardElement = document.getElementById('keyboard');
+
+      keys.forEach(({ note, octave, isWhiteKey }) => {
+        const key = createKey(note, octave, isWhiteKey);
+        keyboardElement.appendChild(key);
+      });
+    };
+
+    const destroyKeyboard = () => {
+      const keyboardElement = document.getElementById('keyboard');
+      keyboardElement.innerHTML = '';
+    };
+
+    const playSound = (key) => {
+      key.classList.add('active');
+      const note = key.dataset.note;
+      const octave = parseInt(key.dataset.octave);
+
+      const oscillator = audioContext.createOscillator();
+      oscillator.type = 'sine';
+
+      const frequency = getFrequency(note, octave);
+
+      oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+      oscillator.connect(audioContext.destination);
+      oscillator.start();
+      oscillatorMap.set(key, oscillator);
+    };
+
+    const toggleSustainKey = (key) => {
+      if (sustainedKeys.has(key)) {
+        sustainedKeys.delete(key);
+        stopSound(key);
+      } else {
+        sustainedKeys.add(key);
+        playSound(key);
+      }
+    };
+
+    const stopSound = (key) => {
+      key.classList.remove('active');
+      if (oscillatorMap.has(key)) {
+        const existingOscillator = oscillatorMap.get(key);
+        existingOscillator.stop();
+        oscillatorMap.delete(key);
+      }
+    };
+
+    const stopAllSounds = () => {
+      sustainedKeys.forEach((key) => {
+        sustainedKeys.delete(key);
+        stopSound(key);
+      });
+    };
+
+    const updateTuning = () => {
+      const tuningSelector = document.getElementById('tuning');
+      tuningType = tuningSelector.value;
+
+      const keySelector = document.getElementById('keySelector');
+      keySelector.style.display = tuningType === 'just' || tuningType === 'pythagorean' ? 'block' : 'none';
+    };
+
+    const updateKey = () => {
+      const keySelector = document.getElementById('key');
+      baseKey = keySelector.value;
+    };
+
+    const updateTuningFrequency = () => {
+      const frequencySelector = document.getElementById('hz');
+      tuningFrequency = parseFloat(frequencySelector.value);
+    };
+
+    const updateSustainMode = () => {
+      const sustainSelector = document.getElementById('sustain');
+      sustainMode = sustainSelector.value === 'true';
+      stopAllSounds();
+      
+      destroyKeyboard();
+      createKeyboard();
+    };
+
+    const getFrequency = (note, octave) => {
+        const baseFrequency = noteFrequencies[baseKey] * Math.pow(2, octave);
+        const interval = getInterval(note);
+        const ratio = getRatio(interval);
+        const frequency = baseFrequency * ratio * (tuningFrequency / 440);
+        return frequency;
+    };
+
+    const getRatio = (interval) => {
+        return interval >= 0 ? (ratios[tuningType][interval] || 1) : (ratios[tuningType][interval + 12] / 2|| 1);
+    };
+
+    const getInterval = (note) => {
+        const baseNoteIndex = notes.indexOf(baseKey);
+        const noteIndex = notes.indexOf(note);
+
+        return (noteIndex - baseNoteIndex) % 12;
+    };
+
+    const oscillatorMap = new Map();
+
+    window.addEventListener('DOMContentLoaded', () => {
+      createKeyboard();
+    });
+  </script>
+</body>
+</html>
